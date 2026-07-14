@@ -1,0 +1,7 @@
+# 資料與執行環境不進版本庫（資料走 GitHub Release、runtime 是本機可攜 Python）
+data/
+runtime/
+cloudflared.exe
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
