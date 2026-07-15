@@ -47,14 +47,17 @@ def line_push(channel_token: str, user_id: str, text: str) -> tuple[bool, str]:
     if not ids:
         return False, "未提供 user ID"
     try:
-        if len(ids) == 1:
+        msgs = [{"type": "text", "text": text[:4900]}]
+        if len(ids) == 1 and ids[0].lower() == "all":
+            # 廣播：發給所有加入官方帳號的好友（家人加好友即可收到，免抓 user ID）
+            endpoint = "https://api.line.me/v2/bot/message/broadcast"
+            payload = {"messages": msgs}
+        elif len(ids) == 1:
             endpoint = "https://api.line.me/v2/bot/message/push"
-            payload = {"to": ids[0],
-                       "messages": [{"type": "text", "text": text[:4900]}]}
+            payload = {"to": ids[0], "messages": msgs}
         else:
             endpoint = "https://api.line.me/v2/bot/message/multicast"
-            payload = {"to": ids[:500],
-                       "messages": [{"type": "text", "text": text[:4900]}]}
+            payload = {"to": ids[:500], "messages": msgs}
         r = session().post(endpoint,
                            headers={"Authorization": f"Bearer {channel_token}"},
                            json=payload, timeout=30)

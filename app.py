@@ -881,10 +881,11 @@ with tab_settings:
         line_token = st.text_input("LINE Channel Access Token",
                                    value=db.get_meta(con, "line_token") or "",
                                    type="password")
-        line_uid = st.text_input("LINE User ID（U 開頭）",
-                                 value=db.get_meta(con, "line_user_id") or "")
-        st.caption("免費申請：LINE Developers → Messaging API channel → "
-                   "channel access token；免費額度 200 則/月。")
+        line_uid = st.text_input("LINE 收件人（填 all＝廣播給所有加入官方帳號的好友；"
+                                 "或填 U 開頭 ID，逗號分隔可多人）",
+                                 value=db.get_meta(con, "line_user_id") or "all")
+        st.caption("免費額度 200 則/月「按收件人數計」：廣播給 4 人＝每次扣 4 則。"
+                   "家人只要掃官方帳號 QR 加好友即可收到。")
         if st.button("🔔 發送測試訊息（LINE）"):
             if line_token and line_uid:
                 ok, err = notify.line_push(line_token, line_uid, "台股篩選器測試 ✅")
