@@ -40,15 +40,24 @@ def windows_toast(title: str, body: str) -> tuple[bool, str]:
 
 
 def line_push(channel_token: str, user_id: str, text: str) -> tuple[bool, str]:
-    """LINE Messaging API push。需免費申請官方帳號取得 channel access token
-    與自己的 user ID（加入官方帳號後可從 webhook 或官方後台取得）。"""
+    """LINE Messaging API push。user_id 可用逗號/空白分隔多個收件人（multicast）。
+    需免費申請官方帳號取得 channel access token 與 user ID。"""
+    import re
+    ids = [i for i in re.split(r"[,\s;]+", user_id or "") if i]
+    if not ids:
+        return False, "未提供 user ID"
     try:
-        r = session().post(
-            "https://api.line.me/v2/bot/message/push",
-            headers={"Authorization": f"Bearer {channel_token}"},
-            json={"to": user_id,
-                  "messages": [{"type": "text", "text": text[:4900]}]},
-            timeout=30)
+        if len(ids) == 1:
+            endpoint = "https://api.line.me/v2/bot/message/push"
+            payload = {"to": ids[0],
+                       "messages": [{"type": "text", "text": text[:4900]}]}
+        else:
+            endpoint = "https://api.line.me/v2/bot/message/multicast"
+            payload = {"to": ids[:500],
+                       "messages": [{"type": "text", "text": text[:4900]}]}
+        r = session().post(endpoint,
+                           headers={"Authorization": f"Bearer {channel_token}"},
+                           json=payload, timeout=30)
         if r.status_code == 200:
             return True, ""
         return False, f"HTTP {r.status_code}: {r.text[:200]}"
