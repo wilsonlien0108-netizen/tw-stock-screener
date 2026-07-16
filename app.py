@@ -929,7 +929,8 @@ with tab_settings:
     i_line = ic7.checkbox("LINE 通知", value=icfg_data.get("line", True),
                           help="使用上方推播區塊設定的 LINE token/user ID")
     i_win = ic8.checkbox("Windows 通知", value=icfg_data.get("windows", True))
-    if st.button("💾 儲存監控設定"):
+    ib1, ib2 = st.columns(2)
+    if ib1.button("💾 儲存監控設定", use_container_width=True):
         intraday.save_config({"enabled": i_enabled,
                           "watchlist": "" if i_wl == "（所有自選股清單）" else i_wl,
                           "k1_count": int(i_k1), "k5_count": int(i_k5),
@@ -937,6 +938,24 @@ with tab_settings:
                           "line": i_line, "windows": i_win,
                           "cooldown_min": int(i_cool), "poll_sec": 20})
         st.success("已儲存。明天開盤起生效（記得設定排程或手動啟動監控程式）。")
+    if ib2.button("🔔 發送監控測試通知（模擬觸發）", use_container_width=True,
+                  help="用假訊號走一次真實通知路徑，會實際發出 LINE 廣播與桌面通知"):
+        test_msg = (f"🔥 2330 台積電 1分K連{int(i_k1)}紅"
+                    + (f"＋5分K連{int(i_k5)}紅" if i_k5 else "")
+                    + "｜現價 2440（+1.2%）【監控測試訊息】")
+        results = []
+        if i_win:
+            ok, err = notify.windows_toast("盤中K棒訊號（測試）", test_msg)
+            results.append(f"Windows：{'✅' if ok else '❌ ' + err}")
+        if i_line:
+            tk = db.get_meta(con, "line_token") or ""
+            ud = db.get_meta(con, "line_user_id") or ""
+            if tk and ud:
+                ok, err = notify.line_push(tk, ud, test_msg)
+                results.append(f"LINE：{'✅' if ok else '❌ ' + err}")
+            else:
+                results.append("LINE：未設定 token，略過")
+        st.info("　".join(results) if results else "兩個通知管道都沒勾選")
 
     st.divider()
     st.subheader("☁️ 雲端發佈（給家人朋友的手機版）")

@@ -3,6 +3,7 @@
 用法：
     py scripts/intraday_monitor.py           # 正常執行（交易時段外會直接結束）
     py scripts/intraday_monitor.py --force   # 忽略時段限制（測試用）
+    py scripts/intraday_monitor.py --test    # 發送一則模擬觸發通知後結束
 """
 import sys
 import time
@@ -49,6 +50,13 @@ def notify_hit(con, cfg, code: str, name: str, desc: str, price, prev_close):
 def main():
     force = "--force" in sys.argv
     cfg = intraday.load_config()
+    if "--test" in sys.argv:
+        con = db.connect()
+        notify_hit(con, cfg, "2330", "台積電",
+                   f"1分K連{cfg['k1_count']}紅＋5分K連{cfg['k5_count']}紅【測試】",
+                   2440.0, 2411.0)
+        log("測試通知已送出，結束。")
+        return
     if not cfg.get("enabled") and not force:
         log("盤中監控未啟用（請在 App「資料與設定」開啟），結束。")
         return
