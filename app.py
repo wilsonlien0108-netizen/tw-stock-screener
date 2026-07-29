@@ -94,20 +94,21 @@ def run_update(price_days, insti_days):
 
 # ══════════════════ 側邊欄：預設值與策略 ══════════════════
 DEFAULTS = {
-    "k_ma": [5, 10, 20], "k_bullish": False,
+    "k_ma": [5, 10, 20], "k_require_above": False, "k_bullish": False,
     "k_kd": False, "k_macd": False, "k_bb": False, "k_rsi": (0, 100),
     "k_bias": 0.0, "k_rs": 0,
     "k_fdays": 0, "k_tdays": 0, "k_totbuy": False, "k_bigthr": 400,
     "k_biginc": False, "k_retdec": False, "k_findown": 0,
     "k_revyoy": -100.0, "k_yield": 0.0, "k_pe": 0.0,
     "k_revhigh": 0, "k_yoystreak": 0,
-    "k_concepts": [], "k_wl": "（全部股票）", "k_minvol": 500,
+    "k_concepts": [], "k_wl": "1150719股票分析", "k_minvol": 0,
 }
 for _k, _v in DEFAULTS.items():
     st.session_state.setdefault(_k, _v)
 
 PARAM_KEYS = {  # 策略儲存欄位 ↔ widget key
-    "require_bullish": "k_bullish", "kd_cross": "k_kd", "macd_flip": "k_macd",
+    "require_above": "k_require_above", "require_bullish": "k_bullish",
+    "kd_cross": "k_kd", "macd_flip": "k_macd",
     "bb_break": "k_bb", "rsi_range": "k_rsi", "bias_max": "k_bias",
     "rs_min": "k_rs", "foreign_days": "k_fdays", "trust_days": "k_tdays",
     "total_buy": "k_totbuy", "big_increase": "k_biginc",
@@ -169,9 +170,13 @@ with st.sidebar:
                             help="預設只輪詢接近均線的候選股（快 3 倍）；勾選改為全市場")
 
     with st.expander("📏 均線條件", expanded=True):
-        ma_choice = st.multiselect("站上均線（收盤價 > 均線）", [3, 5, 8, 10, 20, 60],
-                                   key="k_ma")
-        require_bullish = st.checkbox("均線多頭排列（短>長）", key="k_bullish")
+        require_above = st.checkbox("要求股價站上所選均線", key="k_require_above",
+                                    help="取消勾選後，篩選與已存策略都不限制股價是否站上均線")
+        ma_choice = st.multiselect("均線週期", [3, 5, 8, 10, 20, 60],
+                                   key="k_ma",
+                                   help="即使不作為篩選條件，仍用於圖表與指標計算")
+        require_bullish = st.checkbox("均線多頭排列（短>長）", key="k_bullish",
+                                      disabled=not require_above)
 
     with st.expander("📐 技術指標與動能"):
         kd_cross = st.checkbox("KD 黃金交叉（今日 K 上穿 D）", key="k_kd")
@@ -222,7 +227,8 @@ with st.sidebar:
 
 wl_codes = set(db.load_watchlist(con, wl_pick)) if wl_pick != "（全部股票）" else None
 params = dict(
-    require_above=True, require_bullish=require_bullish,
+    require_above=require_above,
+    require_bullish=bool(require_bullish and require_above),
     kd_cross=kd_cross, macd_flip=macd_flip, bb_break=bb_break,
     rsi_range=list(rsi_range), bias_max=float(bias_max), rs_min=int(rs_min),
     foreign_days=foreign_days, trust_days=trust_days, total_buy=total_buy,
