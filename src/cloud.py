@@ -6,6 +6,7 @@ Streamlit Cloud 上的 App 啟動／定期檢查該檔案，有新版就下載�
 """
 import json
 import os
+import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,25 @@ from .sources.http import session
 
 SYNC_MARKER = db.DATA_DIR / "cloud_sync.json"
 CHECK_INTERVAL_MIN = 30
+SENSITIVE_META_TERMS = ("token", "secret", "password", "credential", "api_key")
+
+
+def _sanitize_snapshot(path: Path) -> list[str]:
+    """Remove credentials and personal delivery identifiers from a public snapshot."""
+    con = sqlite3.connect(path)
+    try:
+        keys = [row[0] for row in con.execute("SELECT key FROM meta").fetchall()]
+        sensitive = [
+            key for key in keys
+            if key == "line_user_id"
+            or any(term in key.lower() for term in SENSITIVE_META_TERMS)
+        ]
+        con.executemany("DELETE FROM meta WHERE key=?", ((key,) for key in sensitive))
+        con.commit()
+        return sensitive
+    finally:
+        con.close()
+
 
 
 def data_url() -> str | None:
@@ -139,6 +159,9 @@ def publish(progress=None) -> str:
     con = db.connect()
     con.execute("VACUUM INTO ?", (str(snap),))
     con.close()
+    removed = _sanitize_snapshot(snap)
+    if removed:
+        log(f"已移除 {len(removed)} 個本機憑證／識別設定…")
     size_mb = snap.stat().st_size / 1048576
 
     try:
