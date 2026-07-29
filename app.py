@@ -913,42 +913,65 @@ with tab_settings:
             st.write("•", line)
 
     st.divider()
-    st.subheader("📟 盤中 K 棒監控（1分/5分連紅通知）")
-    st.caption("獨立監控程式在盤中每 20 秒取樣重建 1分/5分 K 棒，偵測連續收紅後"
-               "推播 LINE／Windows 通知。監控對象取自自選股清單。"
-               "啟動方式：雙擊「啟動盤中監控.bat」，或雙擊「設定盤中監控排程.bat」"
-               "讓它每個平日 08:58 自動啟動（13:32 自動收工）。")
+    st.subheader("📟 盤中 K 棒監控（連紅／連綠通知）")
+    st.caption("獨立監控程式在盤中每 20 秒取樣重建 1分/5分 K 棒，分別偵測多方連紅與空方連綠，"
+               "符合任一組完整條件後推播 LINE／Windows。監控對象取自自選股清單。"
+               "排程於平日 08:58 自動啟動，13:32 自動收工。")
     icfg_data = intraday.load_config()
-    ic1, ic2, ic3, ic4 = st.columns(4)
+    ic1, ic2, ic3 = st.columns(3)
     i_enabled = ic1.toggle("啟用監控", value=icfg_data.get("enabled", False))
     wl_all = db.watchlist_names(con)
     i_wl = ic2.selectbox("監控清單", ["（所有自選股清單）"] + wl_all,
                          index=(wl_all.index(icfg_data["watchlist"]) + 1
                                 if icfg_data.get("watchlist") in wl_all else 0))
-    i_k1 = ic3.slider("1分K 連續收紅根數", 1, 10, icfg_data.get("k1_count", 3))
-    i_k5 = ic4.slider("5分K 連續收紅根數", 0, 6, icfg_data.get("k5_count", 2),
-                      help="0 = 不看 5 分K")
-    ic5, ic6, ic7, ic8 = st.columns(4)
-    i_mode = ic5.selectbox("條件組合", ["AND（同時成立）", "OR（任一成立）"],
+    i_cool = ic3.slider("同檔冷卻（分鐘）", 5, 240,
+                        icfg_data.get("cooldown_min", 30))
+
+    st.markdown("**🔥 多方連紅條件**")
+    rc1, rc2, rc3 = st.columns(3)
+    i_k1 = rc1.slider("1分K 連續收紅根數", 1, 10,
+                      icfg_data.get("k1_count", 3))
+    i_k5 = rc2.slider("5分K 連續收紅根數", 0, 6,
+                      icfg_data.get("k5_count", 2), help="0 = 不看 5 分K")
+    i_mode = rc3.selectbox("連紅條件組合", ["AND（同時成立）", "OR（任一成立）"],
                            index=0 if icfg_data.get("mode", "AND") == "AND" else 1)
-    i_cool = ic6.slider("同檔冷卻（分鐘）", 5, 240, icfg_data.get("cooldown_min", 30))
-    i_line = ic7.checkbox("LINE 通知", value=icfg_data.get("line", True),
+
+    st.markdown("**📉 空方連綠條件**")
+    gc1, gc2, gc3, gc4 = st.columns(4)
+    i_green = gc1.toggle("啟用連綠通知",
+                         value=icfg_data.get("green_enabled", False))
+    i_gk1 = gc2.slider("1分K 連續收綠根數", 1, 10,
+                       icfg_data.get("k1_green_count", 3), disabled=not i_green)
+    i_gk5 = gc3.slider("5分K 連續收綠根數", 1, 6,
+                       icfg_data.get("k5_green_count", 2), disabled=not i_green)
+    i_gmode = gc4.selectbox("連綠條件組合", ["AND（同時成立）", "OR（任一成立）"],
+                            index=0 if icfg_data.get("green_mode", "AND") == "AND" else 1,
+                            disabled=not i_green)
+
+    nc1, nc2 = st.columns(2)
+    i_line = nc1.checkbox("LINE 通知", value=icfg_data.get("line", True),
                           help="使用上方推播區塊設定的 LINE token/user ID")
-    i_win = ic8.checkbox("Windows 通知", value=icfg_data.get("windows", True))
+    i_win = nc2.checkbox("Windows 通知", value=icfg_data.get("windows", True))
     ib1, ib2 = st.columns(2)
     if ib1.button("💾 儲存監控設定", use_container_width=True):
         intraday.save_config({"enabled": i_enabled,
                           "watchlist": "" if i_wl == "（所有自選股清單）" else i_wl,
                           "k1_count": int(i_k1), "k5_count": int(i_k5),
                           "mode": "AND" if i_mode.startswith("AND") else "OR",
+                          "green_enabled": i_green,
+                          "k1_green_count": int(i_gk1),
+                          "k5_green_count": int(i_gk5),
+                          "green_mode": "AND" if i_gmode.startswith("AND") else "OR",
                           "line": i_line, "windows": i_win,
                           "cooldown_min": int(i_cool), "poll_sec": 20})
-        st.success("已儲存。明天開盤起生效（記得設定排程或手動啟動監控程式）。")
+        st.success("已儲存。若監控程式正在執行，請重新啟動後套用新條件。")
     if ib2.button("🔔 發送監控測試通知（模擬觸發）", use_container_width=True,
                   help="用假訊號走一次真實通知路徑，會實際發出 LINE 廣播與桌面通知"):
-        test_msg = (f"🔥 2330 台積電 1分K連{int(i_k1)}紅"
+        test_msg = (f"🧪 盤中K棒監控｜多方：1分K連{int(i_k1)}紅"
                     + (f"＋5分K連{int(i_k5)}紅" if i_k5 else "")
-                    + "｜現價 2440（+1.2%）【監控測試訊息】")
+                    + (f"；空方：1分K連{int(i_gk1)}綠＋5分K連{int(i_gk5)}綠"
+                       if i_green else "")
+                    + "【監控測試訊息】")
         results = []
         if i_win:
             ok, err = notify.windows_toast("盤中K棒訊號（測試）", test_msg)

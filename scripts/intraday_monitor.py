@@ -32,7 +32,8 @@ def log(msg: str):
 
 def notify_hit(con, cfg, code: str, name: str, desc: str, price, prev_close):
     chg = f"（{(price / prev_close - 1) * 100:+.1f}%）" if prev_close else ""
-    msg = f"🔥 {code} {name} {desc}｜現價 {price}{chg}"
+    icon = "📉" if "綠" in desc else "🔥"
+    msg = f"{icon} {code} {name} {desc}｜現價 {price}{chg}"
     if cfg.get("windows"):
         notify.windows_toast("盤中K棒訊號", msg)
     if cfg.get("line"):
@@ -53,8 +54,9 @@ def main():
     if "--test" in sys.argv:
         con = db.connect()
         notify_hit(con, cfg, "2330", "台積電",
-                   f"1分K連{cfg['k1_count']}紅＋5分K連{cfg['k5_count']}紅【測試】",
-                   2440.0, 2411.0)
+                   f"1分K連{cfg['k1_green_count']}綠＋"
+                   f"5分K連{cfg['k5_green_count']}綠【空方測試】",
+                   2350.0, 2411.0)
         log("測試通知已送出，結束。")
         return
     if not cfg.get("enabled") and not force:
@@ -71,8 +73,11 @@ def main():
         log("沒有可監控的股票（自選股清單是空的），結束。")
         return
     names = dict(con.execute("SELECT code, name FROM stocks").fetchall())
-    log(f"開始監控 {len(pairs)} 檔｜1分K連{cfg['k1_count']}紅 "
-        f"{cfg['mode']} 5分K連{cfg['k5_count']}紅｜"
+    green_desc = (f"｜綠：1分K連{cfg['k1_green_count']}綠 "
+                  f"{cfg.get('green_mode', 'AND')} 5分K連{cfg['k5_green_count']}綠"
+                  if cfg.get("green_enabled") else "")
+    log(f"開始監控 {len(pairs)} 檔｜紅：1分K連{cfg['k1_count']}紅 "
+        f"{cfg['mode']} 5分K連{cfg['k5_count']}紅{green_desc}｜"
         f"每 {cfg['poll_sec']} 秒取樣，冷卻 {cfg['cooldown_min']} 分鐘")
 
     builder = intraday.BarBuilder()

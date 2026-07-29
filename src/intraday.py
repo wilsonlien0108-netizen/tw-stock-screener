@@ -18,6 +18,10 @@ DEFAULT_CONFIG = {
     "k1_count": 3,          # 1分K 連續收紅根數
     "k5_count": 2,          # 5分K 連續收紅根數
     "mode": "AND",          # AND=兩條件同時成立 / OR=任一成立
+    "green_enabled": False,
+    "k1_green_count": 3,    # 1分K 連續收綠根數
+    "k5_green_count": 2,    # 5分K 連續收綠根數
+    "green_mode": "AND",
     "line": True,
     "windows": True,
     "cooldown_min": 30,     # 同一檔觸發後的冷卻分鐘數
@@ -84,6 +88,15 @@ def _consecutive_red(bars: list[tuple[str, float, float]], n: int) -> bool:
         return False
     return all(c > o for _, o, c in bars[-n:])
 
+def _consecutive_green(bars: list[tuple[str, float, float]], n: int) -> bool:
+    """最後 n 根皆收綠（收盤嚴格小於開盤）。"""
+    if n <= 0:
+        return True
+    if len(bars) < n:
+        return False
+    return all(c < o for _, o, c in bars[-n:])
+
+
 
 def check_signal(code: str, builder: BarBuilder, cfg: dict, now: datetime) -> str | None:
     """符合條件時回傳描述文字，否則 None。"""
@@ -93,14 +106,31 @@ def check_signal(code: str, builder: BarBuilder, cfg: dict, now: datetime) -> st
         hit = red1 and red5
     else:
         hit = red1 or red5
-    if not hit:
-        return None
-    parts = []
-    if red1:
-        parts.append(f"1分K連{cfg['k1_count']}紅")
-    if red5:
-        parts.append(f"5分K連{cfg['k5_count']}紅")
-    return "＋".join(parts)
+    if hit:
+        parts = []
+        if red1:
+            parts.append(f"1分K連{cfg['k1_count']}紅")
+        if red5:
+            parts.append(f"5分K連{cfg['k5_count']}紅")
+        return "＋".join(parts)
+
+    if cfg.get("green_enabled", False):
+        green1 = _consecutive_green(
+            builder.completed_1m(code, now), cfg["k1_green_count"])
+        green5 = _consecutive_green(
+            builder.completed_5m(code, now), cfg["k5_green_count"])
+        if cfg.get("green_mode", "AND") == "AND":
+            green_hit = green1 and green5
+        else:
+            green_hit = green1 or green5
+        if green_hit:
+            parts = []
+            if green1:
+                parts.append(f"1分K連{cfg['k1_green_count']}綠")
+            if green5:
+                parts.append(f"5分K連{cfg['k5_green_count']}綠")
+            return "＋".join(parts)
+    return None
 
 
 def resolve_codes(con, cfg: dict) -> list[tuple[str, str]]:
